@@ -7,24 +7,26 @@ function normalizeEmail(email: string) {
 
 export async function getUserIdOrNull(): Promise<string | null> {
   const session = await auth();
-  const email = session?.user?.email ? normalizeEmail(session.user.email) : null;
+  const rawEmail = session?.user?.email ?? null;
+  if (!rawEmail) return null;
 
-  if (!email) return null;
+  const email = normalizeEmail(rawEmail);
 
-  // Use email as the stable internal user id (simple + avoids uniqueness conflicts).
-  const userId = email;
+  // Prefer email as id for newly-created users (simple), but never fight the UNIQUE(email).
+  const preferredId = email;
 
-  // Ensure a row exists; safe even if called repeatedly.
-  await query(
+  const rows = await query<{ id: string }>(
     `
     INSERT INTO users (id, email)
     VALUES ($1, $2)
-    ON CONFLICT (id)
+    ON CONFLICT (email)
     DO UPDATE SET email = EXCLUDED.email
+    RETURNING id
     `,
-    [userId, email]
+    [preferredId, email]
   );
 
+  const userId = rows[0]?.id ?? null;
   return userId;
 }
 
