@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { setSessionCookie } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -13,8 +12,8 @@ export async function GET() {
       data: {
         skipped: true,
         message:
-          "DATABASE_URL is not set in this environment. Seed skipped to avoid build-time DB failures. Set DATABASE_URL in Vercel env vars (Preview + Production) and hit /api/seed again after deploy."
-      }
+          "DATABASE_URL is not set in this environment. Seed skipped. Set DATABASE_URL in env vars and retry.",
+      },
     });
   }
 
@@ -66,15 +65,6 @@ export async function GET() {
       );
     `);
 
-    const demoId = "user_demo";
-    await query(
-      `INSERT INTO users (id, email) VALUES ($1, $2)
-       ON CONFLICT (id) DO NOTHING`,
-      [demoId, "demo@cinemaguru.local"]
-    );
-
-    setSessionCookie(demoId);
-
     const countRows = await query<{ count: string }>(
       `SELECT COUNT(*)::text AS count FROM titles`
     );
@@ -86,7 +76,7 @@ export async function GET() {
         { id: "t3", name: "Aurora Protocol", year: 2025, genres: ["Sci-Fi", "Action"] },
         { id: "t4", name: "Cedar Street", year: 2022, genres: ["Drama"] },
         { id: "t5", name: "The Last Signal", year: 2024, genres: ["Sci-Fi"] },
-        { id: "t6", name: "Glass River", year: 2026, genres: ["Mystery", "Drama"] }
+        { id: "t6", name: "Glass River", year: 2026, genres: ["Mystery", "Drama"] },
       ];
 
       for (const t of titles) {
@@ -101,11 +91,7 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      data: {
-        skipped: false,
-        message:
-          "Seed complete. Signed in as demo user via cookie. Try /api/titles, /api/favorites, /api/watch-later, /api/activities."
-      }
+      data: { skipped: false, message: "Seed complete." },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

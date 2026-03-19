@@ -1,22 +1,32 @@
-import { cookies } from "next/headers";
+import { auth } from "@/auth";
+import { query } from "@/lib/db";
 
-const COOKIE_NAME = "cg_session";
+export async function getUserIdOrNull(): Promise<string | null> {
+  const session = await auth();
+  const email = session?.user?.email ?? null;
+  const githubId = session?.user?.id ?? null;
 
-export async function requireUserId(): Promise<string> {
-  const userId = cookies().get(COOKIE_NAME)?.value;
-  if (!userId) throw new Error("Not authenticated. Visit /api/seed first.");
+  if (!email || !githubId) return null;
+
+  // Internal id: stable and readable
+  const userId = `gh_${githubId}`;
+
+  // Ensure a user row exists (id is stable; email can be updated)
+  await query(
+    `
+    INSERT INTO users (id, email)
+    VALUES ($1, $2)
+    ON CONFLICT (id)
+    DO UPDATE SET email = EXCLUDED.email
+    `,
+    [userId, email]
+  );
+
   return userId;
 }
 
-export async function getUserIdOrNull(): Promise<string | null> {
-  return cookies().get(COOKIE_NAME)?.value ?? null;
-}
-
-export function setSessionCookie(userId: string) {
-  cookies().set(COOKIE_NAME, userId, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/"
-  });
+export async function requireUserId(): Promise<string> {
+  const userId = await getUserIdOrNull();
+  if (!userId) throw new Error("Unauthorized");
+  return userId;
 }
