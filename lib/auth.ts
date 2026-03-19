@@ -1,17 +1,20 @@
 import { auth } from "@/auth";
 import { query } from "@/lib/db";
 
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
 export async function getUserIdOrNull(): Promise<string | null> {
   const session = await auth();
-  const email = session?.user?.email ?? null;
-  const githubId = session?.user?.id ?? null;
+  const email = session?.user?.email ? normalizeEmail(session.user.email) : null;
 
-  if (!email || !githubId) return null;
+  if (!email) return null;
 
-  // Internal id: stable and readable
-  const userId = `gh_${githubId}`;
+  // Use email as the stable internal user id (simple + avoids uniqueness conflicts).
+  const userId = email;
 
-  // Ensure a user row exists (id is stable; email can be updated)
+  // Ensure a row exists; safe even if called repeatedly.
   await query(
     `
     INSERT INTO users (id, email)

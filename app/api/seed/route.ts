@@ -21,10 +21,14 @@ export async function GET() {
     await query(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
-        email TEXT UNIQUE NOT NULL,
+        email TEXT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+
+    // ✅ Critical: remove old UNIQUE(email) constraint if it exists from earlier versions.
+    // This prevents random 500s when inserting/updating users.
+    await query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_key;`);
 
     await query(`
       CREATE TABLE IF NOT EXISTS titles (
@@ -65,6 +69,7 @@ export async function GET() {
       );
     `);
 
+    // Seed titles (only if empty)
     const countRows = await query<{ count: string }>(
       `SELECT COUNT(*)::text AS count FROM titles`
     );
